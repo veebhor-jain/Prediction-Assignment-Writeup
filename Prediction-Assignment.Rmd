@@ -1,0 +1,97 @@
+---
+title: "Prediction Assignment Writeup"
+author: "VJ"
+date: "24 April 2016"
+output: html_document
+---
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. They have been very generous in allowing their data to be used for this kind of assignment.
+
+##Goal
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set.
+
+##Getting and Cleaning the Data
+
+First we load the required R packages for our analysis.
+
+```{r, echo=TRUE}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(randomForest)
+```
+
+Then we load the given data sets.
+
+```{r, echo=TRUE}
+#The data sets should be saved in your working directory
+testing<-read.csv("pml-testing.csv")
+training<-read.csv("pml-training.csv")
+```
+
+Now we look at the data set to get a better understanfing of the data being processed.
+
+```{r}
+summary(training)
+```
+
+There are some junk values, e.x: skewness_yaw_belt variable has 406 #DIV/0! values that does not fit in with the data set since all the values are expected to be integers. Also, there are a lot of cells with empty string, e.x: kurtosis_yaw_belt variable has 19216 empty strings. These are all converted to NA's using the na.strings option.
+
+```{r, echo=TRUE}
+training<-read.csv("pml-training.csv", header=TRUE, na.strings=c("NA", "#DIV/0!", ""), stringsAsFactors=FALSE)
+testing<-read.csv("pml-testing.csv", header=TRUE, na.string=c("NA", "#DIV/0!", ""), stringsAsFactors=FALSE)
+training$classe <- as.factor(training$classe)
+```
+
+Now, only the variables without any NA's are extracted and saved n the data set. The old data set is considerablly reduced. Note that the testing data set need not be cleaned as it wont be used in our analysis.
+
+```{r, echo=TRUE}
+training<-training[,colSums(is.na(training)) == 0]
+dim(training)
+```
+
+Let us look at the final set of variables we have.
+
+```{r, echo=TRUE}
+names(training)
+```
+
+Observe that variables 1 to 7 are not to be included in the analysis.
+
+```{r, echo=TRUE}
+training <- training[,-c(1,2,3,4,5,6,7)]
+```
+
+##prediction Model
+
+For Cross Validation, we seperate the tarining set in two parts (60:40) to get a new of test and training data sets, then we use the trainControl functon for a 5-fold cross validation. We use Random Forest for our computations.
+
+```{r, echo=TRUE}
+set.seed(12345)
+inTrain <- createDataPartition(training$classe, p=0.6, list=FALSE)
+newTraining <- training[inTrain,]
+newTesting <- training[-inTrain,]
+fitCtrl<-trainControl(method="cv", number=5, allowParallel=T, verbose=T)
+modelFit<-train(newTraining$classe~., data=newTraining, method="rf", preProcess=c("center", "scale"), trControl=fitCtrl, verbose=F)
+pred<-predict(modelFit, newdata=newTesting)
+confusionMatrix(pred, newTesting$classe)
+```
+
+##Conclusion
+
+As shown in the confusion matrix, the resulting model is 99% accurate :)
